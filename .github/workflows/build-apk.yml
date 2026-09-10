@@ -49,7 +49,8 @@ jobs:
           cat > latest.json <<EOF
           {
             "version": "$VER",
-            "apk_url": "https://github.com/jay9973/matcha_app/releases/download/${VER}/matcha-${VER}.apk",
+            "apk_url": "https://github.com/jay9973/matcha_app/releases/download/${VER}/app-debug.apk",
+            "apk_name": "app-debug.apk",
             "checksum": "$SHA",
             "note": "MATCHA 자동 배포 버전"
           }
@@ -63,7 +64,7 @@ jobs:
           # 같은 버전 태그 재배포 가능하게 기존 릴리스 삭제 후 재생성
           gh release delete "$VER" --yes --cleanup-tag 2>/dev/null || true
           gh release create "$VER" \
-            "android/app/build/outputs/apk/debug/app-debug.apk#matcha-${VER}.apk" \
+            "android/app/build/outputs/apk/debug/app-debug.apk" \
             latest.json \
             --title "MATCHA v${VER}" \
-            --notes "자동 배포. APK: matcha-${VER}.apk (debug)"
+            --notes "자동 배포. APK: app-debug.apk (debug)"
