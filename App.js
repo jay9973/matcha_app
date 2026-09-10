@@ -27,6 +27,8 @@ export default function App() {
   const [checking, setChecking] = useState(false);
   // 로딩 상태: 웹앱이 뜨기 전 로딩 화면 표시
   const [loading, setLoading] = useState(true);
+  // APK 다운로드를 위해 WebView로 잠시 열 URL (OS 다운로더 트리거)
+  const [openUrl, setOpenUrl] = useState(null);
 
   // 최신 릴리스 확인
   const checkForUpdate = async () => {
@@ -76,7 +78,7 @@ export default function App() {
     <View style={styles.container}>
       <StatusBar style="auto" />
       <WebView
-        source={{ uri: WEB_URL }}
+        source={{ uri: openUrl || WEB_URL }}
         style={styles.webview}
         startInLoadingState={true}
         javaScriptEnabled={true}
@@ -112,17 +114,14 @@ export default function App() {
             <TouchableOpacity
               style={styles.btnPrimary}
               onPress={() => {
-                // WebView로 APK URL을 열어 다운로드 유도
-                // (Android: 기본 다운로더엔 연결이 안 되므로, 아래 URL 복사 안내 방식도 병행)
-                alert(
-                  'Apk 다운로드 링크:\n' +
-                  update.apk_url +
-                  '\n\n브라우저에서 열어 설치하세요.'
-                );
-                setUpdate(null);
+                // WebView로 APK URL을 열어 OS 다운로더/설치 화면을 트리거
+                if (update && typeof update === 'object') {
+                  setOpenUrl(update.apk_url);
+                  setUpdate(null); // 다이얼로그 닫기
+                }
               }}
             >
-              <Text style={styles.btnPrimaryText}>다운로드</Text>
+              <Text style={styles.btnPrimaryText}>업데이트</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.btnGhost} onPress={closeUpdate}>
               <Text style={styles.btnGhostText}>닫기</Text>
