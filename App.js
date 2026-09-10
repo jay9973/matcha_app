@@ -6,7 +6,6 @@ import {
   Text,
   Image,
   Animated,
-  AppState,
   TouchableOpacity,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
@@ -54,33 +53,21 @@ export default function App() {
     });
   };
 
-  // 웹앱 로드 완료: 최소시간(1.5초) 보장 후 페이드아웃
+  // 첫 로드 여부 (앱 시작 시 1회만 로고 표시, 재진입 reload는 로고 없이)
+  const firstLoadRef = useRef(true);
+  const handleLoadStart = () => {
+    // 첫 로드에만 로고 표시 (재진입 reload는 웹만 배경 갱신)
+    if (firstLoadRef.current) {
+      setLoading(true);
+      firstLoadRef.current = false;
+    }
+  };
+
+  // 웹앱 로드 완료: 첫 로드면 최소시간(1.5초) 후 페이드아웃, 재진입이면 즉시 숨김 처리
   const handleLoadEnd = () => {
     checkForUpdate();
-    // 이미 로고가 최소시간만큼 떴는지와 무관하게, 최소시간을 기다렸다가 페이드아웃
-    const startedAt = Date.now();
-    const elapsed = startedAt - (firstLoadRef.current || startedAt);
-    const wait = Math.max(0, MIN_LOGO_MS - elapsed);
-    setTimeout(hideLogo, wait);
+    setTimeout(hideLogo, MIN_LOGO_MS); // 항상 최소시간 대기하되, 첫 로드만 표시됨
   };
-
-  // 첫 로드 시작 시각 보정(매 로드 시 초기화되는 로직 방지용)
-  const firstLoadRef = useRef(null);
-  const handleLoadStart = () => {
-    if (!firstLoadRef.current) firstLoadRef.current = Date.now();
-    setLoading(true);
-  };
-
-  // 백그라운드 → 포그라운드 전환 시 웹 코드 최신화(reload)
-  useEffect(() => {
-    const sub = AppState.addEventListener('change', (next) => {
-      if (next === 'active' && webviewRef.current) {
-        // 완전종료 전 재접속 때마다 최신 웹 소스로 갱신
-        webviewRef.current.reload();
-      }
-    });
-    return () => sub.remove();
-  }, []);
 
   const closeUpdate = () => setUpdate(null);
 
