@@ -16,7 +16,8 @@ const WEB_URL = 'https://matcha-food.vercel.app';
 
 // 최신 릴리스 조회(public 저장소) — GitHub API
 const REPO = 'jay9973/matcha_app';
-const LATEST_API = `https://api.github.com/repos/${REPO}/releases/latest`;
+// 업데이트 메타: 'latest' 릴리스에 고정 배포되는 static latest.json (GitHub API rate-limit 회피)
+const LATEST_JSON_URL = `https://github.com/${REPO}/releases/download/latest/latest.json`;
 
 // 현재 이 앱의 버전 (app.json의 version)
 const CURRENT_VERSION = Constants.expoConfig?.version || '1.0.0';
@@ -76,16 +77,15 @@ export default function App() {
     if (checking) return;
     setChecking(true);
     try {
-      const res = await fetch(LATEST_API, {
-        headers: { Accept: 'application/vnd.github+json' },
-      });
+      // 'latest' 릴리스의 static latest.json 직접 fetch (GitHub API rate-limit 영향 없음)
+      const res = await fetch(LATEST_JSON_URL);
       if (!res.ok) throw new Error('HTTP ' + res.status);
-      const rel = await res.json();
-      const tagVersion = rel.tag_name;
-      const apkAsset = (rel.assets || []).find(a => a.name.endsWith('.apk'));
-      if (!apkAsset) { setUpdate('up-to-date'); return; }
+      const meta = await res.json();
+      const tagVersion = meta.version;
+      const apkUrl = meta.apk_url;
+      if (!apkUrl) { setUpdate('up-to-date'); return; }
       const newer = compareVersions(tagVersion, CURRENT_VERSION) > 0;
-      setUpdate(newer ? { version: tagVersion, apk_url: apkAsset.browser_download_url } : 'up-to-date');
+      setUpdate(newer ? { version: tagVersion, apk_url: apkUrl } : 'up-to-date');
     } catch (e) {
       console.warn('업데이트 확인 실패:', e.message);
       setUpdate('error');

@@ -87,3 +87,11 @@ jobs:
             latest.json \
             --title "MATCHA v${VER}" \
             --notes "자동 배포. APK: ${APK_NAME} (standalone)"
+
+          # 'latest' 고정 릴리스도 갱신 → 앱이 rate-limit 없이 고정 URL로 최신 확인
+          gh release delete "latest" --yes --cleanup-tag 2>/dev/null || true
+          gh release create "latest" \
+            "${APK_NAME}" \
+            latest.json \
+            --title "MATCHA latest" \
+            --notes "항상 최신 버전 (자동 갱신용 고정 태그)"
