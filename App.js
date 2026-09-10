@@ -112,7 +112,6 @@ export default function App() {
         ref={webviewRef}
         source={{ uri: openUrl || WEB_URL }}
         style={styles.webview}
-        startInLoadingState={true}
         javaScriptEnabled={true}
         domStorageEnabled={true}
         allowsBackForwardNavigationGestures={true}
