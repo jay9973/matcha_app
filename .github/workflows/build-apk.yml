@@ -29,28 +29,28 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Prebuild Android (generate native project)
-        run: npx expo prebuild --platform android --no-install
+      - name: Export Android (standalone release bundle)
+        run: npx expo export:android --output-dir dist
 
-      - name: Build debug APK (Gradle)
+      - name: Build release APK (Gradle)
         working-directory: android
         run: |
           chmod +x gradlew
-          ./gradlew :app:assembleDebug --no-daemon
+          ./gradlew :app:assembleRelease --no-daemon
 
       - name: Compute version & checksum
         id: meta
         run: |
           VER=$(grep '"version"' app.json | head -1 | sed -E 's/.*"version": *"([^"]+)".*/\1/')
-          APK="android/app/build/outputs/apk/debug/app-debug.apk"
+          APK="android/app/build/outputs/apk/release/app-release.apk"
           SHA=$(sha256sum "$APK" | awk '{print $1}')
           echo "version=$VER" >> "$GITHUB_OUTPUT"
           echo "sha=$SHA" >> "$GITHUB_OUTPUT"
           cat > latest.json <<EOF
           {
             "version": "$VER",
-            "apk_url": "https://github.com/jay9973/matcha_app/releases/download/${VER}/app-debug.apk",
-            "apk_name": "app-debug.apk",
+            "apk_url": "https://github.com/jay9973/matcha_app/releases/download/${VER}/app-release.apk",
+            "apk_name": "app-release.apk",
             "checksum": "$SHA",
             "note": "MATCHA 자동 배포 버전"
           }
@@ -64,7 +64,7 @@ jobs:
           # 같은 버전 태그 재배포 가능하게 기존 릴리스 삭제 후 재생성
           gh release delete "$VER" --yes --cleanup-tag 2>/dev/null || true
           gh release create "$VER" \
-            "android/app/build/outputs/apk/debug/app-debug.apk" \
+            "android/app/build/outputs/apk/release/app-release.apk" \
             latest.json \
             --title "MATCHA v${VER}" \
-            --notes "자동 배포. APK: app-debug.apk (debug)"
+            --notes "자동 배포. APK: app-release.apk (standalone)"
