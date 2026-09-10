@@ -4,6 +4,8 @@ import {
   StyleSheet,
   View,
   Text,
+  Image,
+  ActivityIndicator,
   TouchableOpacity,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
@@ -23,6 +25,8 @@ export default function App() {
   // 업데이트 상태: null(확인중/없음) | {version, apk_url} | 'up-to-date' | 'error'
   const [update, setUpdate] = useState(null);
   const [checking, setChecking] = useState(false);
+  // 로딩 상태: 웹앱이 뜨기 전 로딩 화면 표시
+  const [loading, setLoading] = useState(true);
 
   // 최신 릴리스 확인
   const checkForUpdate = async () => {
@@ -79,8 +83,24 @@ export default function App() {
         domStorageEnabled={true}
         allowsBackForwardNavigationGestures={true}
         geolocationEnabled={true}
-        onLoadEnd={() => checkForUpdate()}
+        onLoadStart={() => setLoading(true)}
+        onLoadEnd={() => { setLoading(false); checkForUpdate(); }}
       />
+
+      {/* 로딩 오버레이 — 웹앱 뜨기 전, 아이콘 + 회전 스피너 */}
+      {loading && (
+        <View style={[styles.overlay, styles.loadingWrap]}>
+          <View style={styles.loadingCard}>
+            <Image
+              source={require('./assets/icon.png')}
+              style={styles.loadingIcon}
+              resizeMode="contain"
+            />
+            <ActivityIndicator size="small" color="#8b95a1" />
+            <Text style={styles.loadingText}>MATCHA를 불러오는 중...</Text>
+          </View>
+        </View>
+      )}
 
       {/* 업데이트 오버레이(순수 View) — 새 버전 있을 때 */}
       {update !== null && typeof update === 'object' && (
@@ -131,6 +151,28 @@ const styles = StyleSheet.create({
   webview: { flex: 1 },
   modalRoot: { position: 'absolute', left: 0, top: 0, right: 0, bottom: 0 },
   overlay: { backgroundColor: 'rgba(0,0,0,0.45)' },
+  // 로딩 화면 (흰 배경 + 아이콘 + 스피너)
+  loadingWrap: {
+    position: 'absolute',
+    left: 0, top: 0, right: 0, bottom: 0,
+    backgroundColor: '#ffffff',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingCard: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingIcon: {
+    width: 96,
+    height: 96,
+    marginBottom: 14,
+  },
+  loadingText: {
+    fontSize: 14,
+    color: '#8b95a1',
+    marginTop: 8,
+  },
   dialog: {
     width: '84%',
     backgroundColor: '#fff',
