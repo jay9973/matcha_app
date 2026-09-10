@@ -56,15 +56,19 @@ jobs:
         id: meta
         run: |
           VER=$(grep '"version"' app.json | head -1 | sed -E 's/.*"version": *"([^"]+)".*/\1/')
-          APK="android/app/build/outputs/apk/release/app-release.apk"
-          SHA=$(sha256sum "$APK" | awk '{print $1}')
+          SRC="android/app/build/outputs/apk/release/app-release.apk"
+          # 산출물 이름: matcha-release-<버전>.apk
+          APK_NAME="matcha-release-${VER}.apk"
+          cp "$SRC" "$APK_NAME"
+          SHA=$(sha256sum "$APK_NAME" | awk '{print $1}')
           echo "version=$VER" >> "$GITHUB_OUTPUT"
           echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+          echo "apk_name=$APK_NAME" >> "$GITHUB_OUTPUT"
           cat > latest.json <<EOF
           {
             "version": "$VER",
-            "apk_url": "https://github.com/jay9973/matcha_app/releases/download/${VER}/app-release.apk",
-            "apk_name": "app-release.apk",
+            "apk_url": "https://github.com/jay9973/matcha_app/releases/download/${VER}/${APK_NAME}",
+            "apk_name": "${APK_NAME}",
             "checksum": "$SHA",
             "note": "MATCHA 자동 배포 버전"
           }
@@ -75,10 +79,11 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           VER="${{ steps.meta.outputs.version }}"
+          APK_NAME="${{ steps.meta.outputs.apk_name }}"
           # 같은 버전 태그 재배포 가능하게 기존 릴리스 삭제 후 재생성
           gh release delete "$VER" --yes --cleanup-tag 2>/dev/null || true
           gh release create "$VER" \
-            "android/app/build/outputs/apk/release/app-release.apk" \
+            "${APK_NAME}" \
             latest.json \
             --title "MATCHA v${VER}" \
-            --notes "자동 배포. APK: app-release.apk (standalone)"
+            --notes "자동 배포. APK: ${APK_NAME} (standalone)"
