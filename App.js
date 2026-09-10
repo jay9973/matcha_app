@@ -34,6 +34,8 @@ export default function App() {
   // 로딩(로고) 상태
   const [loading, setLoading] = useState(true);
   const [openUrl, setOpenUrl] = useState(null);
+  // 설치 가이드(다운로드 완료 후 안내) 표시 여부
+  const [guide, setGuide] = useState(false);
 
   const webviewRef = useRef(null);
   const fadeAnim = useRef(new Animated.Value(0)).current; // 0(투명) → 1(불투명)
@@ -138,13 +140,15 @@ export default function App() {
             <Text style={styles.title}>새 버전 사용 가능</Text>
             <Text style={styles.msg}>
               MATCHA v{update.version} 업데이트가 준비되었습니다.
+              {'\n'}다운로드를 시작합니다.
             </Text>
             <TouchableOpacity
               style={styles.btnPrimary}
               onPress={() => {
                 if (update && typeof update === 'object') {
-                  setOpenUrl(update.apk_url);
+                  setOpenUrl(update.apk_url); // WebView로 APK 열어 OS 다운로더 기동
                   setUpdate(null);
+                  setGuide(true); // 설치 가이드 표시
                 }
               }}
             >
@@ -152,6 +156,26 @@ export default function App() {
             </TouchableOpacity>
             <TouchableOpacity style={styles.btnGhost} onPress={closeUpdate}>
               <Text style={styles.btnGhostText}>닫기</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
+      {/* 설치 가이드 — 다운로드 완료 후 설치 방법 안내 */}
+      {guide && (
+        <View style={[styles.overlay, styles.modalRoot]}>
+          <View style={styles.dialog}>
+            <Text style={styles.title}>설치 안내</Text>
+            <Text style={styles.msg}>
+              APK 다운로드가 시작되었습니다.{'\n\n'}
+              1. 화면 위 **다운로드 완료 알림**을 탭하세요.{'\n'}
+              2. 표시되는 **APK 파일**을 탭하면 설치 화면이 열립니다.{'\n'}
+              3. **설치** → **열기**(확인) 를 누르면 업데이트됩니다.{'\n\n'}
+              ※ 알림에서 설치가 안 열리면, 파일 관리자에서{'\n'}
+                'Download' 폴더의 matcha APK를 탭하세요.
+            </Text>
+            <TouchableOpacity style={styles.btnPrimary} onPress={() => { setGuide(false); setOpenUrl(null); setLoading(true); }}>
+              <Text style={styles.btnPrimaryText}>확인</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -174,7 +198,12 @@ function compareVersions(a, b) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
   webview: { flex: 1 },
-  modalRoot: { position: 'absolute', left: 0, top: 0, right: 0, bottom: 0 },
+  modalRoot: {
+    position: 'absolute',
+    left: 0, top: 0, right: 0, bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   overlay: { backgroundColor: 'rgba(0,0,0,0.45)' },
   // 로딩 화면 (흰 배경 + 로고 중앙)
   loadingWrap: {
