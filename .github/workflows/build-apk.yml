@@ -30,7 +30,7 @@ jobs:
         run: npm ci
 
       - name: Export Android (standalone release bundle)
-        run: npx expo export:android --output-dir dist
+        run: npx expo export -p android --output-dir dist --clear
 
       - name: Build release APK (Gradle)
         working-directory: android
