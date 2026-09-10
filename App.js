@@ -16,8 +16,8 @@ const WEB_URL = 'https://matcha-food.vercel.app';
 
 // 최신 릴리스 조회(public 저장소) — GitHub API
 const REPO = 'jay9973/matcha_app';
-// 업데이트 메타: 'latest' 릴리스에 고정 배포되는 static latest.json (GitHub API rate-limit 회피)
-const LATEST_JSON_URL = `https://github.com/${REPO}/releases/download/latest/latest.json`;
+// 업데이트 메타: Vercel 웹앱에 호스팅된 update.json (CORS·리다이렉트·rate-limit 전부 회피)
+const LATEST_JSON_URL = 'https://matcha-food.vercel.app/update.json';
 
 // 현재 이 앱의 버전 (app.json의 version)
 const CURRENT_VERSION = Constants.expoConfig?.version || '1.0.0';
