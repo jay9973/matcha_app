@@ -33,29 +33,15 @@ jobs:
         run: npx expo export -p android --output-dir dist --clear
 
       - name: Debug Gradle env
-        continue-on-error: true
         working-directory: android
         run: |
-          {
-            echo "pwd: $PWD"
-            echo "node: $(node -v 2>&1)"
-            echo "java: $(java -version 2>&1 | head -1)"
-            echo "JAVA_HOME=$JAVA_HOME"
-            echo "PATH=$PATH"
-            chmod +x gradlew
-            echo "--- gradlew --version ---"
-            timeout 120 ./gradlew --version --no-daemon 2>&1
-            echo "GRADLE_EXIT=$?"
-          } > /tmp/gradle_debug.log 2>&1 || true
-          cat /tmp/gradle_debug.log
+          echo "node: $(node -v 2>&1)"
+          echo "java: $(java -version 2>&1 | head -1)"
+          echo "JAVA_HOME=${JAVA_HOME:-unset}"
+          echo "PATH=$PATH" | head -c 200
+          echo
           echo "DEBUG_DONE"
-
-      - name: Upload Gradle debug log
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: gradle-debug
-          path: /tmp/gradle_debug.log
+          exit 0
 
       - name: Build release APK
         working-directory: android
