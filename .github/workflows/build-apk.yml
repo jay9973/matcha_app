@@ -32,7 +32,15 @@ jobs:
       - name: Export Android (standalone release bundle)
         run: npx expo export -p android --output-dir dist --clear
 
-      - name: Build release APK (Gradle)
+      - name: Debug Gradle env
+        working-directory: android
+        run: |
+          echo "node: $(node -v)  java: $(java -version 2>&1 | head -1)"
+          echo "JAVA_HOME=$JAVA_HOME"
+          chmod +x gradlew
+          timeout 120 ./gradlew --version --no-daemon 2>&1 | tail -20 || echo "GRADLE VERSION FAILED"
+
+      - name: Build release APK
         working-directory: android
         run: |
           chmod +x gradlew
