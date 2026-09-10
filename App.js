@@ -1,11 +1,12 @@
 import { StatusBar } from 'expo-status-bar';
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   StyleSheet,
   View,
   Text,
   Image,
-  ActivityIndicator,
+  Animated,
+  AppState,
   TouchableOpacity,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
@@ -21,14 +22,65 @@ const LATEST_API = `https://api.github.com/repos/${REPO}/releases/latest`;
 // 현재 이 앱의 버전 (app.json의 version)
 const CURRENT_VERSION = Constants.expoConfig?.version || '1.0.0';
 
+// 로고 최소 표시 시간(ms) — 이보다 빨리 끝나도 최소한 보여줌
+const MIN_LOGO_MS = 1500;
+// 페이드 전환 길이
+const FADE_MS = 320;
+
 export default function App() {
-  // 업데이트 상태: null(확인중/없음) | {version, apk_url} | 'up-to-date' | 'error'
+  // 업데이트 상태
   const [update, setUpdate] = useState(null);
   const [checking, setChecking] = useState(false);
-  // 로딩 상태: 웹앱이 뜨기 전 로딩 화면 표시
+  // 로딩(로고) 상태
   const [loading, setLoading] = useState(true);
-  // APK 다운로드를 위해 WebView로 잠시 열 URL (OS 다운로더 트리거)
   const [openUrl, setOpenUrl] = useState(null);
+
+  const webviewRef = useRef(null);
+  const fadeAnim = useRef(new Animated.Value(0)).current; // 0(투명) → 1(불투명)
+
+  // 마운트 시: 최소 시간 보장 + 로고 페이드인
+  useEffect(() => {
+    const fadeIn = Animated.timing(fadeAnim, { toValue: 1, duration: 300, useNativeDriver: true });
+    // fade in과 동시에 최소 표시 타이머 시작
+    fadeIn.start();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const hideLogo = () => {
+    Animated.timing(fadeAnim, { toValue: 0, duration: FADE_MS, useNativeDriver: true }).start(() => {
+      setLoading(false);
+    });
+  };
+
+  // 웹앱 로드 완료: 최소시간(1.5초) 보장 후 페이드아웃
+  const handleLoadEnd = () => {
+    checkForUpdate();
+    // 이미 로고가 최소시간만큼 떴는지와 무관하게, 최소시간을 기다렸다가 페이드아웃
+    const startedAt = Date.now();
+    const elapsed = startedAt - (firstLoadRef.current || startedAt);
+    const wait = Math.max(0, MIN_LOGO_MS - elapsed);
+    setTimeout(hideLogo, wait);
+  };
+
+  // 첫 로드 시작 시각 보정(매 로드 시 초기화되는 로직 방지용)
+  const firstLoadRef = useRef(null);
+  const handleLoadStart = () => {
+    if (!firstLoadRef.current) firstLoadRef.current = Date.now();
+    setLoading(true);
+  };
+
+  // 백그라운드 → 포그라운드 전환 시 웹 코드 최신화(reload)
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (next) => {
+      if (next === 'active' && webviewRef.current) {
+        // 완전종료 전 재접속 때마다 최신 웹 소스로 갱신
+        webviewRef.current.reload();
+      }
+    });
+    return () => sub.remove();
+  }, []);
+
+  const closeUpdate = () => setUpdate(null);
 
   // 최신 릴리스 확인
   const checkForUpdate = async () => {
@@ -40,23 +92,11 @@ export default function App() {
       });
       if (!res.ok) throw new Error('HTTP ' + res.status);
       const rel = await res.json();
-
-      // 버전은 태그명. 예: "1.1.0"
       const tagVersion = rel.tag_name;
-      // APK asset 찾기
       const apkAsset = (rel.assets || []).find(a => a.name.endsWith('.apk'));
-      if (!apkAsset) {
-        setUpdate('up-to-date');
-        return;
-      }
-
-      // 버전 비교
+      if (!apkAsset) { setUpdate('up-to-date'); return; }
       const newer = compareVersions(tagVersion, CURRENT_VERSION) > 0;
-      if (newer) {
-        setUpdate({ version: tagVersion, apk_url: apkAsset.browser_download_url });
-      } else {
-        setUpdate('up-to-date');
-      }
+      setUpdate(newer ? { version: tagVersion, apk_url: apkAsset.browser_download_url } : 'up-to-date');
     } catch (e) {
       console.warn('업데이트 확인 실패:', e.message);
       setUpdate('error');
@@ -65,19 +105,11 @@ export default function App() {
     }
   };
 
-  const closeUpdate = () => setUpdate(null);
-
-  // APK 다운로드: WebView를 해당 URL로 잠시 열어 시스템 브라우저/다운로더로 유도
-  // (네이티브 category는 서명·권한에 따라 상이 — 여기선 사용자에게 URL 복사 방법도 제공)
-  const getApkUrl = () => {
-    if (update && typeof update === 'object') return update.apk_url;
-    return '';
-  };
-
   return (
     <View style={styles.container}>
       <StatusBar style="auto" />
       <WebView
+        ref={webviewRef}
         source={{ uri: openUrl || WEB_URL }}
         style={styles.webview}
         startInLoadingState={true}
@@ -85,25 +117,22 @@ export default function App() {
         domStorageEnabled={true}
         allowsBackForwardNavigationGestures={true}
         geolocationEnabled={true}
-        onLoadStart={() => setLoading(true)}
-        onLoadEnd={() => { setLoading(false); checkForUpdate(); }}
+        onLoadStart={handleLoadStart}
+        onLoadEnd={handleLoadEnd}
       />
 
-      {/* 로딩 오버레이 — 웹앱 뜨기 전, 아이콘 + 회전 스피너 */}
+      {/* 로딩 오버레이 — 로고 + 페이드 전환 (최소 1.5초 유지) */}
       {loading && (
-        <View style={[styles.overlay, styles.loadingWrap]}>
-          <View style={styles.loadingCard}>
-            <Image
-              source={require('./assets/icon.png')}
-              style={styles.loadingIcon}
-              resizeMode="contain"
-            />
-            <Text style={styles.loadingText}>MATCHA</Text>
-          </View>
-        </View>
+        <Animated.View style={[styles.loadingWrap, { opacity: fadeAnim }]}>
+          <Image
+            source={require('./assets/icon.png')}
+            style={styles.loadingIcon}
+            resizeMode="contain"
+          />
+        </Animated.View>
       )}
 
-      {/* 업데이트 오버레이(순수 View) — 새 버전 있을 때 */}
+      {/* 업데이트 오버레이 */}
       {update !== null && typeof update === 'object' && (
         <View style={[styles.overlay, styles.modalRoot]}>
           <View style={styles.dialog}>
@@ -114,10 +143,9 @@ export default function App() {
             <TouchableOpacity
               style={styles.btnPrimary}
               onPress={() => {
-                // WebView로 APK URL을 열어 OS 다운로더/설치 화면을 트리거
                 if (update && typeof update === 'object') {
                   setOpenUrl(update.apk_url);
-                  setUpdate(null); // 다이얼로그 닫기
+                  setUpdate(null);
                 }
               }}
             >
@@ -149,7 +177,7 @@ const styles = StyleSheet.create({
   webview: { flex: 1 },
   modalRoot: { position: 'absolute', left: 0, top: 0, right: 0, bottom: 0 },
   overlay: { backgroundColor: 'rgba(0,0,0,0.45)' },
-  // 로딩 화면 (흰 배경 + 아이콘 + 스피너)
+  // 로딩 화면 (흰 배경 + 로고 중앙)
   loadingWrap: {
     position: 'absolute',
     left: 0, top: 0, right: 0, bottom: 0,
@@ -157,20 +185,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  loadingCard: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   loadingIcon: {
     width: 140,
     height: 140,
-    marginBottom: 6,
-  },
-  loadingText: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#191919',
-    letterSpacing: 1,
   },
   dialog: {
     width: '84%',
