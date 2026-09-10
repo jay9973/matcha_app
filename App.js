@@ -4,11 +4,7 @@ import {
   StyleSheet,
   View,
   Text,
-  Alert,
   TouchableOpacity,
-  Modal,
-  Linking,
-  Platform,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import Constants from 'expo-constants';
@@ -24,7 +20,7 @@ const LATEST_API = `https://api.github.com/repos/${REPO}/releases/latest`;
 const CURRENT_VERSION = Constants.expoConfig?.version || '1.0.0';
 
 export default function App() {
-  // 업데이트 상태: null(확인중) | {version, apk_url} | 'up-to-date' | 'error'
+  // 업데이트 상태: null(확인중/없음) | {version, apk_url} | 'up-to-date' | 'error'
   const [update, setUpdate] = useState(null);
   const [checking, setChecking] = useState(false);
 
@@ -41,14 +37,14 @@ export default function App() {
 
       // 버전은 태그명. 예: "1.1.0"
       const tagVersion = rel.tag_name;
-      // APK asset 찾기 (matcha-*.apk)
+      // APK asset 찾기
       const apkAsset = (rel.assets || []).find(a => a.name.endsWith('.apk'));
       if (!apkAsset) {
         setUpdate('up-to-date');
         return;
       }
 
-      // 버전 비교 (숫자 파싱)
+      // 버전 비교
       const newer = compareVersions(tagVersion, CURRENT_VERSION) > 0;
       if (newer) {
         setUpdate({ version: tagVersion, apk_url: apkAsset.browser_download_url });
@@ -63,17 +59,13 @@ export default function App() {
     }
   };
 
-  const downloadAndInstall = () => {
-    if (!update || typeof update === 'string') return;
-    // 안드로이드에서 브라우저/다운로더로 APK 열기 → 이후 시스템 설치
-    Linking.openURL(update.apk_url).catch(err => {
-      Alert.alert('다운로드 실패', err.message);
-    });
-  };
+  const closeUpdate = () => setUpdate(null);
 
-  const closeModalAndRefresh = () => {
-    setUpdate(null);
-    // 웹앱 새로고침은 WebView ref로 가능하나, 모달 닫기만 해도 사용 가능
+  // APK 다운로드: WebView를 해당 URL로 잠시 열어 시스템 브라우저/다운로더로 유도
+  // (네이티브 category는 서명·권한에 따라 상이 — 여기선 사용자에게 URL 복사 방법도 제공)
+  const getApkUrl = () => {
+    if (update && typeof update === 'object') return update.apk_url;
+    return '';
   };
 
   return (
@@ -87,45 +79,49 @@ export default function App() {
         domStorageEnabled={true}
         allowsBackForwardNavigationGestures={true}
         geolocationEnabled={true}
-        onLoadEnd={() => checkForUpdate()}   // 웹앱 로드 후 업데이트 확인
+        onLoadEnd={() => checkForUpdate()}
       />
 
-      {/* 업데이트 다이얼로그 */}
-      <Modal
-        visible={update !== null && typeof update !== 'string'}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setUpdate(null)}
-      >
-        <View style={styles.overlay}>
+      {/* 업데이트 오버레이(순수 View) — 새 버전 있을 때 */}
+      {update !== null && typeof update === 'object' && (
+        <View style={[styles.overlay, styles.modalRoot]}>
           <View style={styles.dialog}>
             <Text style={styles.title}>새 버전 사용 가능</Text>
             <Text style={styles.msg}>
-              MATCHA v{typeof update === 'object' ? update.version : ''} 업데이트가
-              준비되었습니다.
+              MATCHA v{update.version} 업데이트가 준비되었습니다.
             </Text>
-            <TouchableOpacity style={styles.btnPrimary} onPress={downloadAndInstall}>
-              <Text style={styles.btnPrimaryText}>업데이트</Text>
+            <TouchableOpacity
+              style={styles.btnPrimary}
+              onPress={() => {
+                // WebView로 APK URL을 열어 다운로드 유도
+                // (Android: 기본 다운로더엔 연결이 안 되므로, 아래 URL 복사 안내 방식도 병행)
+                alert(
+                  'Apk 다운로드 링크:\n' +
+                  update.apk_url +
+                  '\n\n브라우저에서 열어 설치하세요.'
+                );
+                setUpdate(null);
+              }}
+            >
+              <Text style={styles.btnPrimaryText}>다운로드</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.btnGhost} onPress={() => setUpdate(null)}>
-              <Text style={styles.btnGhostText}>나중에</Text>
+            <TouchableOpacity style={styles.btnGhost} onPress={closeUpdate}>
+              <Text style={styles.btnGhostText}>닫기</Text>
             </TouchableOpacity>
           </View>
         </View>
-      </Modal>
+      )}
     </View>
   );
 }
 
-// "1.0.0" 같은 세그먼트 버전 비교 (a>b>0, a==b==0, a<b<0)
+// "1.0.0" 세그먼트 버전 비교 (a>b:>0, a==b:0, a<b:<0)
 function compareVersions(a, b) {
-  const pa = String(a).replace(/^v/, '').split('.').map(Number);
-  const pb = String(b).replace(/^v/, '').split('.').map(Number);
+  const pa = String(a || '').replace(/^v/, '').split('.').map(x => Number(x) || 0);
+  const pb = String(b || '').replace(/^v/, '').split('.').map(x => Number(x) || 0);
   for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
-    const x = pa[i] || 0;
-    const y = pb[i] || 0;
-    if (x > y) return 1;
-    if (x < y) return -1;
+    if ((pa[i] || 0) > (pb[i] || 0)) return 1;
+    if ((pa[i] || 0) < (pb[i] || 0)) return -1;
   }
   return 0;
 }
@@ -133,14 +129,10 @@ function compareVersions(a, b) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
   webview: { flex: 1 },
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  modalRoot: { position: 'absolute', left: 0, top: 0, right: 0, bottom: 0 },
+  overlay: { backgroundColor: 'rgba(0,0,0,0.45)' },
   dialog: {
-    width: '80%',
+    width: '84%',
     backgroundColor: '#fff',
     borderRadius: 16,
     padding: 22,
