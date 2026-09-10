@@ -96,8 +96,7 @@ export default function App() {
               style={styles.loadingIcon}
               resizeMode="contain"
             />
-            <ActivityIndicator size="small" color="#8b95a1" />
-            <Text style={styles.loadingText}>MATCHA를 불러오는 중...</Text>
+            <Text style={styles.loadingText}>MATCHA</Text>
           </View>
         </View>
       )}
@@ -164,14 +163,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   loadingIcon: {
-    width: 96,
-    height: 96,
-    marginBottom: 14,
+    width: 140,
+    height: 140,
+    marginBottom: 6,
   },
   loadingText: {
-    fontSize: 14,
-    color: '#8b95a1',
-    marginTop: 8,
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#191919',
+    letterSpacing: 1,
   },
   dialog: {
     width: '84%',
