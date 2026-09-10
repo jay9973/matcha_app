@@ -32,6 +32,9 @@ jobs:
       - name: Export Android (standalone release bundle)
         run: npx expo export -p android --output-dir dist --clear
 
+      - name: Prebuild Android (generate native gradle project)
+        run: npx expo prebuild --platform android --no-install
+
       - name: Debug Gradle env
         working-directory: android
         run: |
